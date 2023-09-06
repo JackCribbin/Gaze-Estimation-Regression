@@ -11,11 +11,8 @@ import numpy as np
 import tensorflow as tf
 import keras
 from tensorflow.keras import layers
-from tqdm import tqdm
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 import os
-import pathlib
 from sklearn.model_selection import train_test_split
 
 # Change to the correct directory
@@ -31,8 +28,8 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 epochs = 300
 
 # Choose what type of model (horizontal/vertical) to train and what to call it
-model_type = 'y'
-model_name = 'model_2_0.2'
+model_type = 'dual'
+model_name = 'model_6_short'
 
 # Set where to save model checkpoints
 checkpoint_filepath = 'c:\\users\\jackp\\onedrive\\documents\\_regression\\models\\tmp\\'+model_type+model_name+'_checkpoint'
@@ -51,19 +48,26 @@ train_ds = np.array([each for each in ims.values()]).astype(np.float32)
 # Extract the pixel x and y values from the image filenames
 xs = np.array([int(each[each.index('x=')+2 : each.index('y=')-1]) 
                for each in ims]).astype(np.float32)
+xs = (xs-np.min(xs))/(np.max(xs)-np.min(xs))
 ys = np.array([int(each[each.index('y=')+2 : each.index('.')]) 
                for each in ims]).astype(np.float32)
+ys = (ys-np.min(ys))/(np.max(ys)-np.min(ys))
+
+if(model_type == 'dual'):
+    xys = np.array((xs,ys)).T
 
 # Split the datasets and pixel values into training and validation datasets
 if(model_type == 'x'):
     train_ds, val_ds, train_xs, val_xs = train_test_split(train_ds, xs, test_size=0.3, random_state=101)
 elif(model_type == 'y'):
     train_ds, val_ds, train_ys, val_ys = train_test_split(train_ds, ys, test_size=0.3, random_state=101)
+elif(model_type == 'dual'):
+    train_ds, val_ds, train_xys, val_xys = train_test_split(train_ds, xys, test_size=0.3, random_state=101)
 
 # Initialize a data augmenter for expanding the dataset
 data_augmentation = keras.Sequential(
   [
-    layers.RandomRotation(0.1),
+    #layers.RandomRotation(0.1),
     layers.RandomZoom(0.1),
   ]
 )
@@ -73,7 +77,35 @@ img_height = 100
 img_width = 200
 num_layers = 3
 
+
 # Initialize the model and all of its layers
+# Generation 3 model architecture
+model = tf.keras.Sequential([
+  layers.Rescaling(1./255, input_shape=(img_height, img_width, num_layers)),
+  data_augmentation,
+  layers.Conv2D(16, num_layers, padding='same', activation='relu'),
+  layers.Conv2D(32, num_layers, padding='same', activation='relu'),
+  layers.Conv2D(64, num_layers, padding='same', activation='relu'),
+  layers.MaxPooling2D(),
+  layers.Conv2D(16, num_layers, padding='same', activation='relu'),
+  layers.Conv2D(32, num_layers, padding='same', activation='relu'),
+  layers.Conv2D(64, num_layers, padding='same', activation='relu'),
+  layers.MaxPooling2D(),
+  layers.Conv2D(16, num_layers, padding='same', activation='relu'),
+  layers.Conv2D(32, num_layers, padding='same', activation='relu'),
+  layers.Conv2D(64, num_layers, padding='same', activation='relu'),
+  layers.Flatten(),
+  tf.keras.layers.Dense(units=512, activation='relu'),
+  #tf.keras.layers.Dropout(0.5),
+  tf.keras.layers.Dense(units=256, activation='relu'),
+  #tf.keras.layers.Dropout(0.5),
+  tf.keras.layers.Dense(units=64, activation='relu'),
+  tf.keras.layers.Dense(units=2) should be 2 for single model, 1 for indiv models
+])
+
+
+'''
+# Generation 2 model architecture
 model = tf.keras.Sequential([
   layers.Rescaling(1./255, input_shape=(img_height, img_width, num_layers)),
   data_augmentation,
@@ -85,12 +117,13 @@ model = tf.keras.Sequential([
   layers.MaxPooling2D(),
   layers.Flatten(),
   tf.keras.layers.Dense(units=512, activation='relu'),
-  tf.keras.layers.Dropout(0.2),
+  #tf.keras.layers.Dropout(0.5),
   tf.keras.layers.Dense(units=256, activation='relu'),
-  tf.keras.layers.Dropout(0.2),
+  #tf.keras.layers.Dropout(0.5),
   tf.keras.layers.Dense(units=64, activation='relu'),
   tf.keras.layers.Dense(units=1)
 ])
+'''
 
 # Compile the model and print a summary of its structure
 model.compile(loss='mean_squared_error', optimizer="adam")
@@ -100,12 +133,12 @@ model.summary()
 # loss decreases
 checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
     filepath=checkpoint_filepath, monitor='val_loss', mode='min', 
-    save_best_only=True)
+    save_best_only=True, initial_value_threshold=4000)
 
 # Initialize a callback for stopping the model training early if no improvement
 # is seen after 30 epochs
 early_stop_callback = tf.keras.callbacks.EarlyStopping(
-    monitor='val_loss', min_delta=0, patience = 50)
+    monitor='val_loss', min_delta=0, patience = 100)
 
 # Train the model
 if(model_type == 'x'):
@@ -116,7 +149,12 @@ elif(model_type == 'y'):
     history = model.fit(train_ds, train_ys, validation_data=(val_ds,val_ys), 
                         epochs=epochs, #batch_size=64, #verbose=1,
                         callbacks=[checkpoint_callback, early_stop_callback])
-                        
+elif(model_type == 'dual'):
+    history = model.fit(train_ds, train_xys, validation_data=(val_ds,val_xys), 
+                        epochs=epochs, #batch_size=64, #verbose=1,
+                        callbacks=[checkpoint_callback, early_stop_callback])
+         
+
 # Save the final model trained
 model.save('models/'+model_type+model_name+'master')
 
@@ -127,7 +165,8 @@ val_loss = history.history['val_loss']
 # Print what the minimums for loss and validation loss and at what epoch they
 # occured
 print('Minimum for loss was at epoch:',np.argmin(loss),'of',np.min(loss))
-print('Minimum for validation loss was at epoch:',np.argmin(val_loss),'of',np.min(val_loss))
+print('Minimum for validation loss was at epoch:',
+      np.argmin(val_loss),'of',np.min(val_loss))
 
 # Save the range of epochs for later plotting
 epochs_range = range(len(loss))
@@ -156,7 +195,8 @@ if(len(loss) > 100):
             minval = val_loss[i]
 
     print('(100) Minimum for loss was at epoch:',loss.index(minloss),'of',minloss)
-    print('(100) Minimum for validation loss was at epoch:',val_loss.index(minval),'of',minval)
+    print('(100) Minimum for validation loss was at epoch:',
+          val_loss.index(minval),'of',minval)
 
 
 minloss = 999999999

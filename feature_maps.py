@@ -6,14 +6,8 @@ Created on Sat Aug 12 18:25:35 2023
 """
 
 import matplotlib.pyplot as plt
-import pathlib
-import numpy as np
-
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.models import Sequential
-
 import os
 import cv2
 
@@ -25,82 +19,61 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 directory = os.path.dirname(os.path.abspath(__file__))
 os.chdir(directory)
 
-#model = keras.models.load_model('models//tmp/xmodel_1.3_checkpoint')
-#model = keras.models.load_model('models/tmp/ymodel_1.3_checkpoint')  
-model = keras.models.load_model('models/tmp/ymodel_2_0.2_checkpoint')  
+# Set the model name and layer number to use and the image to test on
+model_name = 'models/tmp/dualmodel_6_checkpoint'
+layer_number = 12
+image_name = 'example_eyes.jpg'
 
-
-
+# Load the model
+model = keras.models.load_model(model_name)
+  
+# Print out the model architecture  
 for i in range(len(model.layers)):
     layer = model.layers[i]
     if 'conv' not in layer.name:
         continue    
     print(i , layer.name , layer.output.shape)
-    
-model = keras.Model(inputs=model.inputs , outputs=model.layers[6].output) 
 
+# Change the model to be a single layer
+model = keras.Model(inputs=model.inputs , outputs=model.layers[layer_number].output) 
+
+# Print out the layer architecture
 print('\n')
 for i in range(len(model.layers)):
     layer = model.layers[i]
     if 'conv' not in layer.name:
         continue    
     print(i , layer.name , layer.output.shape)
-    
-image_path = os.path.join(directory, 'example_eyes.jpg')
+
+# Load an image in to test with
+image_path = os.path.join(directory, image_name)
 image = cv2.imread(image_path)   
 
 # Convert the image into a keras tensor array
 img_array = tf.keras.utils.img_to_array(image)
 img_array = tf.expand_dims(img_array, 0)
   
-# Calculating features_map
+# Calculate the feature maps
 features = model.predict(img_array)
 
-print('features:',features.shape)
-
+# Display all of the feature maps
 fig = plt.figure(figsize=(20,15))
 for i in range(1,features.shape[3]+1):
     plt.subplot(8,8,i)
     plt.imshow(features[0,:,:,i-1] , cmap='gray')
     
-    #if(i == 26):    
-     #   plt.figure()
-      #  plt.imshow(features[0,:,:,i-1] , cmap='gray')
-       # break
-    #plt.show()
-    
 plt.show()
 
-
-
 '''
-class_namesLR = ['Left', 'MiddleH', 'Right']
-class_namesUD = ['Down', 'MiddleV', 'Up']
-
-# Make a prediction for the label of the image
-# in regards to its horizontal positioning
-predictions = model.predict(img_array)
-
-# Compute the confidence level of the prediction
-score = tf.nn.softmax(predictions[0])
-print(score.shape)
-print(np.argmax(score))
-'''
-
-'''
-# Print the prediction and the confidence level
-print(
-    "\nThis image most likely belongs to {} with a {:.2f} percent confidence."
-    .format(class_namesLR[np.argmax(score)], 100 * np.max(score))
-)
-'''
-
-'''
-# Convert the score Tensor to an array
-scoreLR = np.array(score)
-
-print(scoreLR)
-'''
+# Display a single/multiple specific feature maps
+fig = plt.figure(figsize=(20,15))
+for i in range(1,features.shape[3]+1):
+    if(i == 26):    
+        plt.figure()
+        plt.imshow(features[0,:,:,i-1] , cmap='gray')
+        break
+    plt.show()
+'''   
 
 print('\nDone')
 

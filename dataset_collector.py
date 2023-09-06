@@ -175,9 +175,12 @@ screen = pygame.display.set_mode((1920, 1080), pygame.FULLSCREEN)
 cap = cv2.VideoCapture(0)
 
 # Set the file name number to start and end at
-count = 500
-stop = 750
+count = 1000
+stop = 1500
 slowdown = 0
+
+#20/08/23: x model ok for now, collct more images 
+#looking at top half of screen and retrain y model
 
 collect = False
 check = True
@@ -219,7 +222,8 @@ try:
                             running = False
         slowdown = slowdown + 1
         # If the program hasn't been ended
-        if(loop and slowdown % 3 == 0):
+        if(loop and slowdown % 5 == 0):
+            print(slowdown)
             
             ret, frame = cap.read()
             mousex, mousey = pyautogui.position()

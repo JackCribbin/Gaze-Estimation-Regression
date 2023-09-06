@@ -9,8 +9,6 @@ It then loads a pretrained CNN model and estimates what section of the screen
 the user is looking in, and displays this guess to the screen
 """
 
-import time
-
 import tensorflow as tf
 from tensorflow import keras
 import os
@@ -212,8 +210,8 @@ os.chdir(directory)
 
 
 # Load the two models for horizontal and vertical position approximation
-modelx = keras.models.load_model('models/tmp/xmodel_2_0.2_checkpoint')
-modely = keras.models.load_model('models/tmp/ymodel_2_0.2_checkpoint')
+modelx = keras.models.load_model('models/tmp/xmodel_5_checkpoint')
+modely = keras.models.load_model('models/tmp/ymodel_5_checkpoint')
 
 # Initialize the webcam
 cap = cv2.VideoCapture(0)
@@ -307,9 +305,9 @@ try:
                  
                 # Make a prediction for the label of the image
                 # in regards to its horizontal positioning
-                predictionx = int(modelx.predict(img_array))
+                predictionx = int(modelx.predict(img_array)*size[0])
                 
-                predictiony = int(modely.predict(img_array))
+                predictiony = int(modely.predict(img_array)*size[1])
                 
                 
                 print(predictionx,',',predictiony)
